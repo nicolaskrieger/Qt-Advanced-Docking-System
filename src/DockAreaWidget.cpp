@@ -245,6 +245,7 @@ struct DockAreaWidgetPrivate
 	CDockAreaTitleBar*	TitleBar		= nullptr;
 	CDockManager*		DockManager		= nullptr;
 	bool UpdateTitleBarButtons = false;
+	DockWidgetAreas		AllowedAreas	= AllDockAreas;
 
 	/**
 	 * Private data constructor
@@ -337,6 +338,7 @@ void DockAreaWidgetPrivate::updateTitleBarButtonStates()
 		_this->features().testFlag(CDockWidget::DockWidgetClosable));
 	TitleBar->button(TitleBarButtonUndock)->setEnabled(
 		_this->features().testFlag(CDockWidget::DockWidgetFloatable));
+	TitleBar->updateDockWidgetActionsButtons();
 	UpdateTitleBarButtons = false;
 }
 
@@ -702,6 +704,11 @@ void CDockAreaWidget::updateTitleBarVisibility()
 		return;
 	}
 
+    if (CDockManager::configFlags().testFlag(CDockManager::AlwaysShowTabs))
+    {
+        return;
+    }
+
 	if (d->TitleBar)
 	{
 		d->TitleBar->setVisible(!Container->isFloating() || !Container->hasTopLevelDockWidget());
@@ -807,6 +814,15 @@ void CDockAreaWidget::setVisible(bool Visible)
 	}
 }
 
+void CDockAreaWidget::setAllowedAreas(DockWidgetAreas areas)
+{
+	d->AllowedAreas = areas;
+}
+
+DockWidgetAreas CDockAreaWidget::allowedAreas() const
+{
+	return d->AllowedAreas;
+}
 
 //============================================================================
 QAbstractButton* CDockAreaWidget::titleBarButton(TitleBarButton which) const
@@ -839,6 +855,13 @@ void CDockAreaWidget::closeArea()
 void CDockAreaWidget::closeOtherAreas()
 {
 	dockContainer()->closeOtherAreas(this);
+}
+
+
+//============================================================================
+CDockAreaTitleBar* CDockAreaWidget::titleBar() const
+{
+	return d->TitleBar;
 }
 } // namespace ads
 

@@ -100,15 +100,6 @@ struct DockWidgetTabPrivate
 		return this->DragState == dragState;
 	}
 
-	/**
-	 * Returns true if the given global point is inside the title area geometry
-	 * rectangle.
-	 * The position is given as global position.
-	 */
-	bool titleAreaGeometryContains(const QPoint& GlobalPos) const
-	{
-		return DockArea->titleBarGeometry().contains(DockArea->mapFromGlobal(GlobalPos));
-	}
 
 	/**
 	 * Starts floating of the dock widget that belongs to this title bar
@@ -179,23 +170,15 @@ void DockWidgetTabPrivate::createLayout()
 	TitleLabel->setText(DockWidget->windowTitle());
 	TitleLabel->setObjectName("dockWidgetTabLabel");
 	TitleLabel->setAlignment(Qt::AlignCenter);
+	_this->connect(TitleLabel, SIGNAL(elidedChanged(bool)), SIGNAL(elidedChanged(bool)));
+
 
 	CloseButton = createCloseButton();
 	CloseButton->setObjectName("tabCloseButton");
-	QIcon CloseIcon = CDockManager::iconProvider().customIcon(TabCloseIcon);
-	if (CloseIcon.isNull())
-	{
-		// The standard icons do does not look good on high DPI screens
-		QPixmap normalPixmap = _this->style()->standardPixmap(QStyle::SP_TitleBarCloseButton, 0, CloseButton);
-		CloseIcon.addPixmap(normalPixmap, QIcon::Normal);
-		CloseIcon.addPixmap(internal::createTransparentPixmap(normalPixmap, 0.25), QIcon::Disabled);
-	}
-	CloseButton->setIcon(CloseIcon);
+	internal::setButtonIcon(CloseButton, QStyle::SP_TitleBarCloseButton, TabCloseIcon);
     CloseButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     _this->onDockWidgetFeaturesChanged();
-#ifndef QT_NO_TOOLTIP
-	CloseButton->setToolTip(QObject::tr("Close Tab"));
-#endif
+	internal::setToolTip(CloseButton, QObject::tr("Close Tab"));
 	_this->connect(CloseButton, SIGNAL(clicked()), SIGNAL(closeRequested()));
 
 	QFontMetrics fm(TitleLabel->font());
@@ -426,8 +409,14 @@ void CDockWidgetTab::contextMenuEvent(QContextMenuEvent* ev)
 
 	d->GlobalDragStartMousePosition = ev->globalPos();
 	QMenu Menu(this);
+
+    const bool isFloatable = d->DockWidget->features().testFlag(CDockWidget::DockWidgetFloatable);
+    const bool isNotOnlyTabInContainer =  !d->DockArea->dockContainer()->hasTopLevelDockWidget();
+
+    const bool isDetachable = isFloatable && isNotOnlyTabInContainer;
+
 	auto Action = Menu.addAction(tr("Detach"), this, SLOT(detachDockWidget()));
-	Action->setEnabled(d->DockWidget->features().testFlag(CDockWidget::DockWidgetFloatable));
+    Action->setEnabled(isDetachable);
 	Menu.addSeparator();
 	Action = Menu.addAction(tr("Close"), this, SIGNAL(closeRequested()));
 	Action->setEnabled(isClosable());
@@ -462,6 +451,7 @@ void CDockWidgetTab::setActiveTab(bool active)
 	d->TitleLabel->style()->unpolish(d->TitleLabel);
 	d->TitleLabel->style()->polish(d->TitleLabel);
 	update();
+	updateGeometry();
 
 	emit activeTabChanged();
 }
@@ -502,9 +492,7 @@ void CDockWidgetTab::setIcon(const QIcon& Icon)
 		d->IconLabel = new QLabel();
 		d->IconLabel->setAlignment(Qt::AlignVCenter);
 		d->IconLabel->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
-		#ifndef QT_NO_TOOLTIP
-		d->IconLabel->setToolTip(d->TitleLabel->toolTip());
-		#endif
+		internal::setToolTip(d->IconLabel, d->TitleLabel->toolTip());
 		Layout->insertWidget(0, d->IconLabel, Qt::AlignVCenter);
 		Layout->insertSpacing(1, qRound(1.5 * Layout->contentsMargins().left() / 2.0));
 	}
@@ -569,6 +557,11 @@ void CDockWidgetTab::setVisible(bool visible)
 void CDockWidgetTab::setText(const QString& title)
 {
 	d->TitleLabel->setText(title);
+}
+
+bool CDockWidgetTab::isTitleElided() const
+{
+	return d->TitleLabel->isElided();
 }
 
 
